@@ -2,6 +2,8 @@
 
 A PHP library for working with JSON-stat datasets (https://json-stat.org/). This library provides functions to parse, navigate, and extract data from JSON-stat dataset documents.
 
+This simple library focuses on providing general solutions for the more flexible aspects of JSON-stat like handling 'value', 'status', or dimension information. For the properties that don't require normalization, the library offers the `getJSONstat()` method that exposes all the elements of a JSON-stat dataset response. Finally, the `unflatten()` method can be used to pair data and metadata.
+
 ## Installation
 
 Copy the `JSONstat.php` file to your project and include it:
