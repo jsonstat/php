@@ -1,6 +1,6 @@
 <?php
 /**
- * JSONstat PHP Library v.1.0.0
+ * JSONstat PHP Library v.1.0.1
  * 
  * A PHP library for working with JSON-stat datasets
  * (https://json-stat.org/)
@@ -15,6 +15,13 @@ class JSONstat {
 	 * @var object
 	 */
 	private $jsonstat;
+	public $label;
+	public $dimension;
+	public $size;
+	public $ids;
+	public $ndims;
+	public $value;
+	public $status;
 	
 
 	/**
@@ -89,8 +96,11 @@ class JSONstat {
 		// If no "class", assume "bundle" response and use the first dataset
 		if (!isset($jsonstat->class)) {
 			$vars = get_object_vars($jsonstat);
-			$dsname = key($vars);
-			$jsonstat = $jsonstat->$dsname;
+			$keys = array_keys($vars);
+			if (count($keys) > 0) {
+				$dsname = $keys[0];
+				$jsonstat = $jsonstat->$dsname;
+			}
 		} else {
 			// JSON-stat v.2.0 Verify it's a "dataset" response
 			if ($jsonstat->class != 'dataset') {
@@ -126,9 +136,11 @@ class JSONstat {
 	private function parseObs($obs, $index) {
 		if (is_object($obs)) {
 			$value = isset($obs->{$index}) ? $obs->{$index} : null;
-		} else {
+		} elseif (is_array($obs)) {
 			// An array with a single value can be used to assign the same value or status to all observations
-			$value = isset($obs[$index]) ? $obs[$index] : $obs[0];
+			$value = isset($obs[$index]) ? $obs[$index] : (isset($obs[0]) ? $obs[0] : null);
+		} else {
+			$value = null;
 		}
 		
 		return $value;
@@ -180,7 +192,8 @@ class JSONstat {
 		$arr = array();
 		
 		for ($i = 0; $i < $this->ndims; $i++) {
-			$arr[$i] = $this->toDimIndex($this->ids[$i], $query[$this->ids[$i]]);
+			$val = isset($query[$this->ids[$i]]) ? $query[$this->ids[$i]] : null;
+			$arr[$i] = $this->toDimIndex($this->ids[$i], $val);
 		}
 		
 		return $arr;
@@ -265,7 +278,7 @@ class JSONstat {
 			for ($j = $i + 1; $j < $this->ndims; $j++) {
 				$p *= $this->size[$j];
 			}
-			$indices[$i] = floor($obsIndex / $p) % $this->size[$i];
+			$indices[$i] = (int)floor($obsIndex / $p) % $this->size[$i];
 		}
 		
 		return $indices;
@@ -311,26 +324,22 @@ class JSONstat {
 	 * @return string|null The category label or null if not found
 	 */
 	public function getCategoryLabel($dimId, $catId) {
-		//pendent comprovar altres estructures de categories...
-		//comprovar que nulls van
-
-		$dim = $this->dimension->{$dimId};
-		if(!isset($dim)) {
+		if(!isset($this->dimension->{$dimId})) {
 			return null;
 		}
+		$dim = $this->dimension->{$dimId};
 
-		$label =  $dim->category->label;
-		if(!isset($label)){
+		if(!isset($dim->category->label)){
 			return $catId;
 		}
-
-		$catLabel = $label->{$catId};
 		
-		if(!isset($catLabel)) {
+		$label = $dim->category->label;
+		
+		if(!isset($label->{$catId})) {
 			return null;
 		}
 
-		return $catLabel;
+		return $label->{$catId};
 	}
 
 
@@ -423,9 +432,12 @@ class JSONstat {
 	public function getDimensionLabels() {
 		$labels = array();
 
-		foreach ($this->dimension as $id => $dim) {
-			$labels[$id] = $dim->label;
+		if (is_object($this->dimension) || is_array($this->dimension)) {
+			foreach ($this->dimension as $id => $dim) {
+				$labels[$id] = isset($dim->label) ? $dim->label : null;
+			}
 		}
+
 		return $labels;
 	}
 
@@ -436,7 +448,7 @@ class JSONstat {
 	 * @return array Dimension label string
 	 */
 	public function getDimensionLabel($dimId) {
-		return $this->dimension->$dimId->label;
+		return isset($this->dimension->$dimId->label) ? $this->dimension->$dimId->label : null;
 	}
 
 	/**
@@ -447,6 +459,10 @@ class JSONstat {
 	 */
 
 	public function getCategoryIds($dimId) {
+		if (!isset($this->dimension->$dimId) || !isset($this->dimension->$dimId->category)) {
+			return array();
+		}
+		
 		$cat = $this->dimension->$dimId->category;
 		
 		if (isset($cat->index)) {
